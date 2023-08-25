@@ -1,3 +1,9 @@
+#ifndef ___DECLARATIONS__HH__
+#define ___DECLARATIONS__HH__
+
+#include "IMRPhenomD.h"
+#include "IMRPhenomD_internals.h"
+#include <gsl/gsl_rng.h>
 
 struct Data
 {
@@ -42,6 +48,24 @@ struct Het
     double *pref;
 };
 
+class HetLikeWrap{
+    public:
+        struct Het *het;
+        struct Data *dat;
+        double **sx;
+        double *min_val;
+        double *max_val;
+        double Tobs, dt;
+        int ll;
+
+        HetLikeWrap(double *init_params, double Tobs_, double dt_);
+        void dealloc();
+        void udpate_heterodyne(double *params);
+        double get_ll(double *params);
+
+};
+
+
 void freehet(struct Het *het);
 void lisaskyloc(double t, double *params, double *thetaL, double *phiL);
 double SNRFast(struct Data *dat, int ll, double *params);
@@ -57,7 +81,7 @@ double chisq(struct Data *dat, int ll, double *params, double *AR, double *ER);
 double chisq_het(struct Data *dat, struct Het *het, int ll, double *params, double **ampR, double **phaseR);
 void heterodyne(struct Data *dat, struct Het *het, int ll, double *params);
 void legendre_maker(int J, int U, double **P);
-void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, *Eamp, *Aphase, *Ephase);
+void fullphaseamp(struct Data *dat, int ll, int K, double *params, double *freq, double *Aamp, double *Eamp, double *Aphase, double *Ephase);
 void Antenna(double *params, double Tstart, double Tend, int NF, double *FF, double *TF, double *AAmp, double *EAmp, double *APhase, double *EPhase);
 void antennaphaseamp(struct Data *dat, int ll, double *params);
 double log_likelihood_het(struct Data *dat, struct Het *het, int ll, double *params, double *sx);
@@ -126,3 +150,4 @@ void de_jump(double *paramsx, double *paramsy, double **history, int m, int d, g
 double det(double **A, int N);
 double Tmerger(double *params, double t);
 
+#endif // ___DECLARATIONS__HH__

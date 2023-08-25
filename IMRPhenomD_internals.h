@@ -1,6 +1,8 @@
 #ifndef _LALSIM_IMR_PHENOMD_INTERNALS_H
 #define _LALSIM_IMR_PHENOMD_INTERNALS_H
 
+#include <complex>
+
 /*
  * Copyright (C) 2015 Michael Puerrer, Sebastian Khan, Frank Ohme, Ofek Birnholtz, Lionel London
  *
@@ -101,6 +103,7 @@ of this waveform.
 
 #define findT 1 /* set to 1 to get the time array, 0 otherwise */
 
+const std::complex<double>I(0.0, 1.0);
 
 // From std/LALConstants.h
 
@@ -626,7 +629,7 @@ static const double QNMData_fdamp[] = {0.0140098,0.0140102,0.0140106,0.0140114, 
 ///////////////////////////////////////////////////////////////////////////////
 
 typedef struct tagCOMPLEX16FrequencySeries {
-    double complex *data;
+    std::complex<double> *data;
     char *name;
     long epoch;
     double f0;
@@ -688,8 +691,8 @@ typedef enum {
 
 
 const char *ErrorString(int code);
-void ERROR(ERROR_type e, char *errstr);
-void CHECK(bool assertion, ERROR_type e, char *errstr);
+void ERROR(int e, char *errstr);
+void CHECK(bool assertion, int e, char *errstr);
 void PRINT_WARNING(char *warnstr);
 
 ///////////////////////////////////////////////////////////////////////////////
