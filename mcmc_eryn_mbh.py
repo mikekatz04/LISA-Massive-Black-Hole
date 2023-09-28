@@ -6,6 +6,9 @@ from eryn.backends import HDFBackend
 from eryn.prior import uniform_dist, ProbDistContainer
 import numpy as np
 from eryn.utils import Update
+from eryn.moves import StretchMove
+from lisatools.sampling.moves.skymodehop import SkyMove
+from bbhx.utils.transform import LISA_to_SSB, SSB_to_LISA
 
 from pyHetWrap import pyHetLikeWrap
 
@@ -20,11 +23,37 @@ class HetUpdate:
         best = np.where(last_sample.log_like == last_sample.log_like.max())
         best_params = last_sample.branches["mbh"].coords[best].squeeze().copy()
         breakpoint()
+        best_params[np.array([5, 8, 7, 9])] = convert_sky_coords(
+            *best_params[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=True
+        )
         # update the reference waveform
         self.het_like.udpate_heterodyne(best_params)
 
 
+def convert_sky_coords(t_old, phi_old, costheta_old, psi_old, convert_lisa_to_ssb=True):
+    lam_old = phi_old
+    beta_old = np.pi / 2.0 - np.arccos(costheta_old)
+
+    if convert_lisa_to_ssb:
+        func = LISA_to_SSB
+    else:
+        func = SSB_to_LISA
+
+    t_new, lam_new, beta_new, psi_new = func(t_old, lam_old, beta_old, psi_old)
+
+    phi_new = lam_new
+    costheta_new = np.cos(np.pi / 2.0 - beta_new)
+
+    phi_new = phi_new % (2 * np.pi)
+    psi_new = psi_new % (np.pi)
+
+    return (t_new, phi_new, costheta_new, psi_new)
+
+
 def like_func_wrap(x, like_fn):
+    x[np.array([5, 8, 7, 9])] = convert_sky_coords(
+        *x[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=True
+    )
     try:
         return like_fn.get_like(x)
     except ValueError:
@@ -65,7 +94,7 @@ if __name__ == "__main__":
     phi_ref = 2.0
     t_ref = 1e7
     dist = 10.0  # Gpc
-    theta = 0.6
+    costheta = 0.6
     phi = 2.5
     psi = 0.7
     cosinc = 0.2
@@ -79,12 +108,19 @@ if __name__ == "__main__":
             phi_ref,
             t_ref,
             np.log(dist),
-            theta,
+            costheta,
             phi,
             psi,
             cosinc,
         ]
     )
+
+    moves = [
+        (SkyMove(which="both"), 0.02),
+        (SkyMove(which="long"), 0.05),
+        (SkyMove(which="lat"), 0.05),
+        (StretchMove(), 0.88),
+    ]
 
     like_fn = pyHetLikeWrap(injection_params, Tobs, dt)
 
@@ -96,8 +132,14 @@ if __name__ == "__main__":
         start_state = reader.get_last_sample()
 
     else:
+        # need to map start parameters to LISA frame
+        injection_params_L_frame = injection_params.copy()
+        injection_params_L_frame[np.array([5, 8, 7, 9])] = convert_sky_coords(
+            *injection_params[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=False
+        )
+
         # start around true point
-        tmp_cov = np.ones_like(injection_params) * 1e-3
+        tmp_cov = np.ones_like(injection_params_L_frame) * 1e-3
 
         # can adjust relative values if you wnat
         # tmp_cov[0] = .....
@@ -106,7 +148,7 @@ if __name__ == "__main__":
 
         start_like = np.zeros((ntemps, nwalkers))
         while np.std(start_like) < 5.0:
-            start_params = injection_params * (
+            start_params = injection_params_L_frame * (
                 1.0
                 + factor
                 * tmp_cov[None, None, :]
@@ -136,6 +178,7 @@ if __name__ == "__main__":
         like_func_wrap,
         priors,
         args=[like_fn],
+        moves=moves,
         # nleaves_max={"mbh": 1},
         backend=file_store,
         periodic=periodic,
