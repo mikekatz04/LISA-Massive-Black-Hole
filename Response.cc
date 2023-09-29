@@ -1028,7 +1028,7 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
     }
  
     // Read in FFTed LDC data
-    sprintf(filename, "AET_seg%d_f.dat", seg);
+    sprintf(filename, "new_AET_seg%d_f.dat", seg);
     in = fopen(filename,"r");
     for(int i=0; i< dat->N; i++)
     {
@@ -1086,24 +1086,24 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
 
         if(k == rep)
         {
-            printf("CHECKCHECKCHECK: %e %e %e\n", dat->Tstart, premove[5], dat->Tend);
+            printf("CHECKCHECKCHECK2: %e %e %e\n", dat->Tstart, premove[5], dat->Tend);
             if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
         }
         
-        if(k == rep)
-          {
-          // only subtract sources that have not merged
-            if(premove[5] > dat->Tstart)
-            {
-            // map_params(2, premove);
-            ResponseFreq(dat, 2, premove, AS, ES);
-             for(i=0; i< dat->N; i++)
-             {
-              dat->data[0][i] += AS[i];
-              dat->data[1][i] += ES[i];
-             }
-            }
-          }
+        // if(k != rep)
+        //   {
+        //   // only subtract sources that have not merged
+        //     if(premove[5] > dat->Tstart)
+        //     {
+        //     // map_params(2, premove);
+        //     ResponseFreq(dat, 2, premove, AS, ES);
+        //      for(i=0; i< dat->N; i++)
+        //      {
+        //       dat->data[0][i] -= AS[i];
+        //       dat->data[1][i] -= ES[i];
+        //      }
+        //     }
+        //   }
     }
     fclose(in);
     free_double_vector(AS);
