@@ -23,9 +23,13 @@ class HetUpdate:
         best = np.where(last_sample.log_like == last_sample.log_like.max())
         best_params = last_sample.branches["mbh"].coords[best].squeeze().copy()
 
+        # convert sky frame
         best_params[np.array([5, 8, 7, 9])] = convert_sky_coords(
             *best_params[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=True
         )
+
+        # convert beta-> theta
+        best_params[7] = np.cos(np.pi / 2.0 - np.arcsin(best_params[7]))
 
         # update the reference waveform
         self.het_like.udpate_heterodyne(best_params)
@@ -35,9 +39,9 @@ class HetUpdate:
         )
 
 
-def convert_sky_coords(t_old, phi_old, costheta_old, psi_old, convert_lisa_to_ssb=True):
+def convert_sky_coords(t_old, phi_old, sinbeta_old, psi_old, convert_lisa_to_ssb=True):
     lam_old = phi_old
-    beta_old = np.pi / 2.0 - np.arccos(costheta_old)
+    beta_old = np.arcsin(sinbeta_old)
 
     if convert_lisa_to_ssb:
         func = LISA_to_SSB
@@ -47,22 +51,30 @@ def convert_sky_coords(t_old, phi_old, costheta_old, psi_old, convert_lisa_to_ss
     t_new, lam_new, beta_new, psi_new = func(t_old, lam_old, beta_old, psi_old)
 
     phi_new = lam_new
-    costheta_new = np.cos(np.pi / 2.0 - beta_new)
+    sinbeta_new = np.sin(beta_new)
 
     phi_new = phi_new % (2 * np.pi)
     psi_new = psi_new % (np.pi)
 
-    return (t_new, phi_new, costheta_new, psi_new)
+    return (t_new, phi_new, sinbeta_new, psi_new)
 
 
 def like_func_wrap(x, like_fn):
     x[np.array([5, 8, 7, 9])] = convert_sky_coords(
         *x[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=True
     )
+
+    # convert beta -> theta
+    x[7] = np.cos(np.pi / 2.0 - np.arcsin(x[7]))
     try:
-        return like_fn.get_like(x)
+        out = like_fn.get_like(x)
     except ValueError:
         breakpoint()
+
+    if np.isnan(out):
+        out = -1e300
+
+    return out
 
 
 if __name__ == "__main__":
@@ -92,42 +104,63 @@ if __name__ == "__main__":
 
     priors = {"mbh": ProbDistContainer(priors_in)}
 
-    Mc = 0.2e6
-    Mt = 1e6
-    a1 = 0.5
-    a2 = 0.5
-    phi_ref = 2.0
-    t_ref = 1e7
-    dist = 10.0  # Gpc
-    costheta = 0.6
-    phi = 2.5
-    psi = 0.7
-    cosinc = 0.2
+    # Mc = 0.2e6
+    # Mt = 1e6
+    # a1 = 0.5
+    # a2 = 0.5
+    # phi_ref = 2.0
+    # t_ref = 1e7
+    # dist = 10.0  # Gpc
+    # sinbeta = 0.6
+    # phi = 2.5
+    # psi = 0.7
+    # cosinc = 0.2
 
-    injection_params = np.array(
-        [
-            np.log(Mc),
-            np.log(Mt),
-            a1,
-            a2,
-            phi_ref,
-            t_ref,
-            np.log(dist),
-            costheta,
-            phi,
-            psi,
-            cosinc,
-        ]
-    )
+    premove = np.genfromtxt("search_sources.dat")[:, 2:]
+    NS = len(premove)
+
+    m1, m2 = premove[:, :2].T.copy()
+    premove[:, 0] = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
+    premove[:, 1] = m1 + m2
+
+    premove[:, 0] = np.log(premove[:, 0])
+    premove[:, 1] = np.log(premove[:, 1])
+    premove[:, 6] = np.log(premove[:, 6])
+    premove[:, 7] = np.sin(np.pi / 2.0 - np.arccos(premove[:, 7]))
+
+    is_noise_free = True
+    seg = 0
+    rep = 0
+
+    injection_params = premove[rep].copy()
+    premove_in = premove.flatten().copy()
+
+    # injection_params = np.array(
+    #     [
+    #         np.log(Mc),
+    #         np.log(Mt),
+    #         a1,
+    #         a2,
+    #         phi_ref,
+    #         t_ref,
+    #         np.log(dist),
+    #         sinbeta,
+    #         phi,
+    #         psi,
+    #         cosinc,
+    #     ]
+    # )
 
     moves = [
-        # (SkyMove(which="both"), 0.02),
-        # (SkyMove(which="long"), 0.05),
-        # (SkyMove(which="lat"), 0.05),
+        (SkyMove(which="both", ind_map=dict(cosinc=10, sinbeta=7, lam=8, psi=9)), 0.02),
+        (SkyMove(which="long", ind_map=dict(cosinc=10, sinbeta=7, lam=8, psi=9)), 0.05),
+        (SkyMove(which="lat", ind_map=dict(cosinc=10, sinbeta=7, lam=8, psi=9)), 0.05),
         (StretchMove(), 0.88),
     ]
 
-    like_fn = pyHetLikeWrap(injection_params, Tobs, dt)
+    like_fn = pyHetLikeWrap(
+        injection_params, Tobs, dt, is_noise_free, seg, rep, premove_in, NS
+    )
 
     file_store = "mbh_test.h5"
 

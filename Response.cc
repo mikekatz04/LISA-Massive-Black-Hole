@@ -961,7 +961,7 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
         dat->Tobs = 16.0*Tsegment;
     }
     
-    dat->Tobs = Tsegment;
+    dat->Tobs = Tsegment * 0.97;
     dat->sqrtTobs = sqrt(dat->Tobs);
         
     dat->dt = cadence;
@@ -1018,7 +1018,10 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
       in = fopen(filename,"r");
       for(int i=0; i< dat->N/2; i++)
       {
-        fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+        // fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+
+        dat->SM[id][i] = 1e-37;
+        dat->SN[id][i] = 1e-37;
           //dat->SN[id][i] = dat->SM[id][i];
           // printf("CHECK: %d %d %d %d %e %e\n", i, dat->N/2, id, dat->Nch, dat->SM[id][i], dat->SN[id][i]);
       }
@@ -1026,11 +1029,12 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
     }
  
     // Read in FFTed LDC data
-    sprintf(filename, "AET_seg%d_t.dat", seg);
+    sprintf(filename, "back_AET_seg%d_f.dat", seg);
     in = fopen(filename,"r");
     for(int i=0; i< dat->N; i++)
     {
         fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
+        printf("%d %e %e\n", f, dat->data[0][i], dat->data[1][i]);
     }
     fclose(in);
         
@@ -1083,6 +1087,7 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
 
         if(k == rep)
         {
+            printf("CHECKCHECKCHECK: %e %e %e\n", dat->Tstart, premove[5], dat->Tend);
             if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
         }
         

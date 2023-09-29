@@ -23,7 +23,7 @@ premove[:, 6] = np.log(premove[:, 6])
 # initialize
 is_noise_free = False
 seg = 0
-rep = 1
+rep = 0
 params = premove[rep].copy()
 premove_in = premove.flatten().copy()
 
