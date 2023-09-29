@@ -758,6 +758,7 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
     x = 0.0;
     for(id = 0; id < Nch; id++)
     {
+        // MLK:  NO SM?
         HH = fourier_nwip2(hb[id], hb[id], dat->SN[id], MN, MM, N);
         HR = fourier_nwip2(rb[id], hb[id], dat->SN[id], MN, MM, N);
         het->DD[id] = fourier_nwip2(dat->data[id], dat->data[id], dat->SN[id], MN, MM, N);
@@ -768,7 +769,7 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
         // {
         //     printf("CHECK %e %e\n", dat->SN[id], dat->data[id]);
         // }
-        printf("HetRef %d %e %e %e\n", id, HH, HR, logL) ;; // , dat->data[id], dat->SN[id]);
+        printf("HetRef %d %e %e %e %e\n", id, het->DD[id], HH, HR, logL) ;; // , dat->data[id], dat->SN[id]);
     }
     
     het->SNR = sqrt(x);
@@ -961,15 +962,13 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
         dat->Tobs = 16.0*Tsegment;
     }
     
-    dat->Tobs = Tsegment * 0.97;
+    dat->Tobs = Tsegment;
     dat->sqrtTobs = sqrt(dat->Tobs);
         
     dat->dt = cadence;
     
     dat->Nch = 2;  // only analyze A, E
     dat->N = (int)(dat->Tobs/dat->dt);
-    printf("CCC %e %e %e %d\n", dat->Tobs, Tsegment, dat->dt, dat->N);
-
     
     dat->SN = double_matrix(dat->Nch,dat->N/2);
     dat->SM = double_matrix(dat->Nch,dat->N/2);
@@ -1016,12 +1015,12 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
     {
       sprintf(filename, "specfit_%d_%d.dat", id, seg);
       in = fopen(filename,"r");
+      // printf("CCD %e %e %e %d %d\n", dat->Tobs, Tsegment, dat->dt, dat->N, dat->N/2);
+    
       for(int i=0; i< dat->N/2; i++)
       {
-        // fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+          fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
 
-        dat->SM[id][i] = 1e-37;
-        dat->SN[id][i] = 1e-37;
           //dat->SN[id][i] = dat->SM[id][i];
           // printf("CHECK: %d %d %d %d %e %e\n", i, dat->N/2, id, dat->Nch, dat->SM[id][i], dat->SN[id][i]);
       }
@@ -1029,12 +1028,12 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
     }
  
     // Read in FFTed LDC data
-    sprintf(filename, "back_AET_seg%d_f.dat", seg);
+    sprintf(filename, "AET_seg%d_f.dat", seg);
     in = fopen(filename,"r");
     for(int i=0; i< dat->N; i++)
     {
         fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
-        printf("%d %e %e\n", f, dat->data[0][i], dat->data[1][i]);
+        // printf("%d %e %e\n", f, dat->data[0][i], dat->data[1][i]);
     }
     fclose(in);
         
@@ -1091,7 +1090,7 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
             if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
         }
         
-        if(k != rep)
+        if(k == rep)
           {
           // only subtract sources that have not merged
             if(premove[5] > dat->Tstart)
@@ -1100,8 +1099,8 @@ void with_noise(struct Data *dat, double *params, double Tobs, double dt, int se
             ResponseFreq(dat, 2, premove, AS, ES);
              for(i=0; i< dat->N; i++)
              {
-              dat->data[0][i] -= AS[i];
-              dat->data[1][i] -= ES[i];
+              dat->data[0][i] += AS[i];
+              dat->data[1][i] += ES[i];
              }
             }
           }

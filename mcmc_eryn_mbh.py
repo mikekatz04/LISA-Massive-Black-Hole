@@ -123,12 +123,13 @@ if __name__ == "__main__":
     premove[:, 0] = (m1 * m2) ** (3 / 5) / (m1 + m2) ** (1 / 5)
     premove[:, 1] = m1 + m2
 
+    #  premove[:, 4] = (premove[:, 4] + 1 / 2 * np.pi / 2.0) % (2 * np.pi)
     premove[:, 0] = np.log(premove[:, 0])
     premove[:, 1] = np.log(premove[:, 1])
     premove[:, 6] = np.log(premove[:, 6])
     premove[:, 7] = np.sin(np.pi / 2.0 - np.arccos(premove[:, 7]))
 
-    is_noise_free = True
+    is_noise_free = False
     seg = 0
     rep = 0
 
@@ -162,6 +163,7 @@ if __name__ == "__main__":
         injection_params, Tobs, dt, is_noise_free, seg, rep, premove_in, NS
     )
 
+    breakpoint()
     file_store = "mbh_test.h5"
 
     if file_store in os.listdir():
@@ -222,7 +224,7 @@ if __name__ == "__main__":
         branch_names=["mbh"],
         tempering_kwargs={"ntemps": ntemps, "Tmax": np.inf},
         update_fn=het_update,
-        update_iterations=5,
+        update_iterations=8,
     )
     nsteps_saved = 2000
     sampler.run_mcmc(start_state, nsteps_saved, progress=True, thin_by=25)
