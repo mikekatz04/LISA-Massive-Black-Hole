@@ -73,7 +73,7 @@
 #define cadence 5.0
 
 /* segemnet duration in seconds */
-#define Tsegment 2621440.0
+#define Tsegment 5.270395000000000e+06
 
 
  /* Initial azimuthal position of the guiding center */
@@ -137,5 +137,5 @@
 #define sflag 0
 
 #define etamin 0.05     // lower limit on the symmetric mass ratio (18:1 mass ratio)
-
+#define etamax 0.24999
 

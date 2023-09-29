@@ -764,7 +764,11 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
         het->logLR[id] = HR+0.5*HH;
         logL += het->logLR[id];
         x += HH;
-        // printf("HetRef %d %e %e %e %e\n", id, HH, HR, dat->data[id], dat->SN[id]);
+        // for (int i = 0; i < 100; i+=1)
+        // {
+        //     printf("CHECK %e %e\n", dat->SN[id], dat->data[id]);
+        // }
+        printf("HetRef %d %e %e %e\n", id, HH, HR, logL) ;; // , dat->data[id], dat->SN[id]);
     }
     
     het->SNR = sqrt(x);
@@ -914,6 +918,197 @@ void heterodyne(struct Data *dat, struct Het *het, int ll, double *params)
         
 }
 
+void with_noise(struct Data *dat, double *params, double Tobs, double dt, int seg, int rep, double *premove_in, int NS)
+{
+    
+    // setting the segment # to -1 causes the code to use the full data set
+    
+    // if(argc<3)
+    // {
+    //     printf("./PTMCMC segment# source#\n");
+    //     printf("segment numbers run from 0 to 12\n");
+    //     printf("source numbers start at 0\n");
+    //     return 0;
+    // }
+    
+    // seg = atoi(argv[1]);
+    // rep = atoi(argv[2]);
+
+    FILE* in;
+    FILE* out;
+    char filename[50];
+    double f, fdot, theta, phi, A, iota, psi, phase;
+    double *pnew;
+  double *AS, *ES;
+  double *AQ, *EQ;
+  double AR, AI, ER, EI;
+  double fonfs, Sn, Sm, Acut;
+  double Aar, Aai;
+  double x, y, z;
+  long M, q;
+  long i, j, k, cnt, mult, id; // , NS;
+  double Mc, fstart, fstop, fr;
+  double SNR, logL;
+  double HH, HD, HDQ, DD, Match, MX, ts, ps;
+  double HHA, HDA, DDA, HHE, HDE, DDE, MA, ME;
+    
+    if(seg > 0)
+    {
+        dat->Tobs = Tsegment;
+    }
+    else
+    {
+        dat->Tobs = 16.0*Tsegment;
+    }
+    
+    dat->Tobs = Tsegment;
+    dat->sqrtTobs = sqrt(dat->Tobs);
+        
+    dat->dt = cadence;
+    
+    dat->Nch = 2;  // only analyze A, E
+    dat->N = (int)(dat->Tobs/dat->dt);
+    printf("CCC %e %e %e %d\n", dat->Tobs, Tsegment, dat->dt, dat->N);
+
+    
+    dat->SN = double_matrix(dat->Nch,dat->N/2);
+    dat->SM = double_matrix(dat->Nch,dat->N/2);
+    dat->data = double_matrix(dat->Nch,dat->N);
+    
+    // count the sources
+    // in = fopen("search_sources.dat","r");
+    // NS = -1;
+    // while ((j = fgetc(in)) != EOF)
+    // {
+    //  fscanf(in,"%lf%lf", &x, &x);
+    //  for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+    // NS++;
+    // }
+    
+    // rewind(in);
+
+    // extract the source to be analyzed
+    // for(k=0; k < NS; k++)
+    // {
+    //     if(k == rep)
+    //     {
+    //         fscanf(in,"%lf%lf", &x, &x);
+    //         for(i=0; i< NP; i++) fscanf(in,"%lf", &params[i]);
+    //         //printf("%e\n", params[5]);
+    //     }
+    //     else // wind the file
+    //     {
+    //     fscanf(in,"%lf%lf", &x, &x);
+    //     for(i=0; i< NP; i++) fscanf(in,"%lf", &x);
+    //     }
+    // }
+    // fclose(in);
+    
+    // read in the data and PSDs
+    if(seg > -1)
+    {
+    
+       dat->Tstart = (double)(seg)*dat->Tobs/2.0;
+       dat->Tend = dat->Tstart + dat->Tobs;
+    
+    // read in the previously estimated smooth and full PSDs
+    for(int id=0; id < dat->Nch; id++)
+    {
+      sprintf(filename, "specfit_%d_%d.dat", id, seg);
+      in = fopen(filename,"r");
+      for(int i=0; i< dat->N/2; i++)
+      {
+        fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->SM[id][i], &x, &dat->SN[id][i]);
+          //dat->SN[id][i] = dat->SM[id][i];
+          // printf("CHECK: %d %d %d %d %e %e\n", i, dat->N/2, id, dat->Nch, dat->SM[id][i], dat->SN[id][i]);
+      }
+      fclose(in);
+    }
+ 
+    // Read in FFTed LDC data
+    sprintf(filename, "AET_seg%d_t.dat", seg);
+    in = fopen(filename,"r");
+    for(int i=0; i< dat->N; i++)
+    {
+        fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
+    }
+    fclose(in);
+        
+    }
+    else  // using full data
+    {
+        dat->Tstart = 0.0;
+        dat->Tend = dat->Tobs;
+        
+        // Read in FFTed LDC data
+        in = fopen("AET_f.dat","r");
+        for(int i=0; i< dat->N; i++)
+        {
+            fscanf(in,"%lf%lf%lf%lf\n", &f, &dat->data[0][i], &dat->data[1][i], &x);
+        }
+        fclose(in);
+        
+        // read in the previously estimated smooth and full PSDs
+        for(int id=0; id < dat->Nch; id++)
+        {
+          sprintf(filename, "specav_%d.dat", id);
+          in = fopen(filename,"r");
+          for(i=0; i< dat->N/2; i++)
+          {
+            fscanf(in,"%lf%lf%lf\n", &f, &dat->SM[id][i], &dat->SN[id][i]);
+          }
+          fclose(in);
+        }
+
+    }
+    
+    // printf("%.0f %.0f %d\n", dat->Tobs, dat->Tstart, dat->N);
+    
+    
+    // form up residual by subtracting other BH signals
+    AS = double_vector(dat->N);
+    ES = double_vector(dat->N);
+    in = fopen("search_sources.dat","r");
+        
+    double *premove;
+    for(int k=0; k < NS; k++)
+    {
+        // fscanf(in,"%lf%lf", &x, &x);
+        // for(i=0; i< NP; i++) fscanf(in,"%lf", &premove[i]);
+        
+        premove = &premove_in[k * NP];
+        // printf("\n");
+        // for (int i = 0; i < NP; i += 1)
+        //     printf("%lf ", premove[i]);
+
+        if(k == rep)
+        {
+            if(premove[5] < dat->Tstart || premove[5] > dat->Tend) printf("WARNING: source does not merge during the chosen time interval\n");
+        }
+        
+        if(k != rep)
+          {
+          // only subtract sources that have not merged
+            if(premove[5] > dat->Tstart)
+            {
+            // map_params(2, premove);
+            ResponseFreq(dat, 2, premove, AS, ES);
+             for(i=0; i< dat->N; i++)
+             {
+              dat->data[0][i] -= AS[i];
+              dat->data[1][i] -= ES[i];
+             }
+            }
+          }
+    }
+    fclose(in);
+    free_double_vector(AS);
+    free_double_vector(ES);
+        
+        // change to better intrinsic parameterization
+        // map_params(2, params);
+}
+
 
 void setup_noise_free(struct Data *dat, double *params, double Tobs, double dt)
 {
@@ -980,11 +1175,13 @@ void setup_noise_free(struct Data *dat, double *params, double Tobs, double dt)
 }
 
 
-HetLikeWrap::HetLikeWrap(double *init_params, double Tobs_, double dt_)
+HetLikeWrap::HetLikeWrap(double *init_params, double Tobs_, double dt_, bool is_noise_free, int seg_, int rep_, double *premove, int NS)
 {
 
   Tobs = Tobs_;
   dt = dt_;
+  seg = seg_;
+  rep = rep_;
   het   = new struct Het;
   dat  = new struct Data;
 
@@ -1049,7 +1246,15 @@ HetLikeWrap::HetLikeWrap(double *init_params, double Tobs_, double dt_)
         for (int j=0; j< dat->Nch; j++) sx[i][j] = 1.0;
     }
 
-  setup_noise_free(dat, init_params, Tobs, dt);
+  
+  if (is_noise_free)
+  {
+    setup_noise_free(dat, init_params, Tobs, dt);
+  }
+  else
+  {
+    with_noise(dat, init_params, Tobs, dt, seg, rep, premove, NS);
+  }
   het_space(dat, het, ll, init_params, min_val, max_val);
   heterodyne(dat, het, ll, init_params);
 }
@@ -1059,8 +1264,6 @@ void HetLikeWrap::udpate_heterodyne(double *params)
     freehet(het);
     het_space(dat, het, ll, params, min_val, max_val);
     heterodyne(dat, het, ll, params);
-    delete het;
-    delete dat;
 }
 
 double HetLikeWrap::get_ll(double *params)
@@ -1072,7 +1275,7 @@ void HetLikeWrap::dealloc()
 {
     freehet(het);
     delete het;
-    free_double_matrix(sx, dat->Nch);
+    free_double_matrix(sx, 1); // dat->Nch);
     free_double_matrix(dat->SN, dat->Nch);
     free_double_matrix(dat->SM, dat->Nch);
     free_double_matrix(dat->data, dat->Nch);

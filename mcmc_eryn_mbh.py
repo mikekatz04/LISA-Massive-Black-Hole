@@ -22,12 +22,17 @@ class HetUpdate:
     def __call__(self, iter, last_sample, sampler):
         best = np.where(last_sample.log_like == last_sample.log_like.max())
         best_params = last_sample.branches["mbh"].coords[best].squeeze().copy()
-        breakpoint()
+
         best_params[np.array([5, 8, 7, 9])] = convert_sky_coords(
             *best_params[np.array([5, 8, 7, 9])], convert_lisa_to_ssb=True
         )
+
         # update the reference waveform
         self.het_like.udpate_heterodyne(best_params)
+
+        last_sample.log_like[0, 0] = like_func_wrap(
+            last_sample.branches["mbh"].coords[0, 0, 0], self.het_like
+        )
 
 
 def convert_sky_coords(t_old, phi_old, costheta_old, psi_old, convert_lisa_to_ssb=True):
@@ -116,9 +121,9 @@ if __name__ == "__main__":
     )
 
     moves = [
-        (SkyMove(which="both"), 0.02),
-        (SkyMove(which="long"), 0.05),
-        (SkyMove(which="lat"), 0.05),
+        # (SkyMove(which="both"), 0.02),
+        # (SkyMove(which="long"), 0.05),
+        # (SkyMove(which="lat"), 0.05),
         (StretchMove(), 0.88),
     ]
 
@@ -164,7 +169,6 @@ if __name__ == "__main__":
             print(np.std(start_like))
 
         start_state = State({"mbh": start_params})
-
         assert np.all(
             ~np.isinf(priors["mbh"].logpdf(start_params.reshape(-1, ndims["mbh"])))
         )
@@ -185,8 +189,7 @@ if __name__ == "__main__":
         branch_names=["mbh"],
         tempering_kwargs={"ntemps": ntemps, "Tmax": np.inf},
         update_fn=het_update,
-        update_iterations=-1,
+        update_iterations=5,
     )
-
     nsteps_saved = 2000
     sampler.run_mcmc(start_state, nsteps_saved, progress=True, thin_by=25)

@@ -57,8 +57,9 @@ class HetLikeWrap{
         double *max_val;
         double Tobs, dt;
         int ll;
+        int seg, rep;
 
-        HetLikeWrap(double *init_params, double Tobs_, double dt_);
+        HetLikeWrap(double *init_params, double Tobs_, double dt_, bool is_noise_free, int seg_, int rep_, double *premove, int NS);
         void dealloc();
         void udpate_heterodyne(double *params);
         double get_ll(double *params);
